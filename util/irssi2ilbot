@@ -1,0 +1,130 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use lib 'lib';
+use Encode 'decode';
+use Encode::Guess;
+use Getopt::Long qw(:config auto_help no_ignore_case bundling);
+use Pod::Usage;
+use IrcLog 'get_dbh';
+use DateTime::Format::DateParse;
+
+our $VERSION = '0.01';
+
+GetOptions(
+    'n|nick=s'    => \my $nick,
+    'c|channel=s' => \my $channel,
+    'f|file=s'    => \my $file,
+    'd|dry-run'   => \my $dry_run,
+    'v|version'   => sub { print "irssi2ilbot version $VERSION\n" },
+) or pod2usage;
+
+if (!defined $nick || !defined !$channel || !defined $file) {
+    print "Some options are missing, see --help\n";
+    exit 1;
+}
+
+my $query = get_dbh()->prepare("INSERT INTO irclog (channel, day, nick, timestamp, line) VALUES(?, ?, ?, ?, ?)");
+my $dt;
+
+@ARGV = $file;
+while (my $line = <>) {
+    chomp $line;
+    next if $line =~ /^--- Log closed/;
+    
+    if (my ($date_str) = $line =~ /^--- Log opened (.+)/) {
+        $dt = DateTime::Format::DateParse->parse_datetime($date_str);
+        next;
+    }
+    elsif ($line =~ /^--- Day changed/) {
+        $dt->add(days => 1);
+        next;
+    }
+
+    $line = recode($line);
+    my ($hour, $min, $rest) = $line =~ /^(\d\d):(\d\d)(?:\S+)? (.+)/;
+    $dt->set_hour($hour)->set_minute($min);
+
+    if ($rest =~ /^-!- (\S+) \S+ has joined (\S+)/) {
+        $channel = $2;
+        $nick = $1 if !defined $nick;
+        dbwrite($2, '', "$1 joined $2");
+    }
+    elsif ($rest =~ /^-!- (\S+) \S+ has left (\S+)/) {
+        dbwrite($2, '', "$1 left $2");
+    }
+    elsif ($rest =~ /^-!- (\S+) \S+ has quit/) {
+        dbwrite($channel, '', "$1 left $channel");
+    }
+    elsif ($rest =~ /^-!- (\S+) was kicked from (\S+) by (\S+) \[(.+)]/) {
+        dbwrite($2, '', "$1 was kicked by $3: $4");
+    }
+    elsif ($rest =~ /^-!- \S+ changed the topic of (\S+) to: (.+)/) {
+        dbwrite($1, '', "Topic for $1 is now $2");
+    }
+    elsif ($rest =~ /^-!- (\S+) is now known as (\S+)/) {
+        dbwrite($channel, '', "$2 is now known as $1");
+    }
+    elsif ($rest =~ /^-!- You're now known as (\S+)/) {
+        dbwrite($channel, '', "$nick is now known as $1");
+    }
+    elsif ($rest =~ /^< (\S+)> (.*)/) {
+        dbwrite($channel, $1, $2);
+    }
+    elsif ($rest =~ /^ * (\S+) (.*)/) {
+        dbwrite($channel, "* $1", $2);
+    }
+}
+
+# some IRC users send CP1252-encoded data while others send UTF-8,
+# and irssi doesn't recode the data before logging it, so we need to
+# decode it appropriately
+sub recode {
+    my ($line) = @_;
+    my $utf8 = guess_encoding($line, 'UTF-8');
+    $line = ref $utf8 ? decode('UTF-8', $line) : decode('cp1252', $line);
+    return $line;
+}
+
+sub dbwrite {
+    my ($channel, $who, $line) = @_;
+    my @sql_args = ($channel, $dt->ymd, $who, $dt->epoch, $line);
+   
+    if ($dry_run) {
+        print join '|', @sql_args;
+        print "\n";
+    }
+    else {
+        $query->execute(@sql_args);
+    }
+    return;
+}
+
+=head1 NAME
+
+irssi2ilbot - Feed irssi logs to ilbot's database
+
+=head1 SYNOPSIS
+
+B<irssi2ilbot> [options]
+
+ Options:
+   -c FOO, --channel=FOO   The name of the channel (required)
+   -n BAR, --nick=BAR      Nickname of the logging user (required)
+   -f FILE, --file=FILE    Path to the log file (required)
+   -d, --dry-run           Print the data without entering it into the DB
+   -h, --help              Display this help message
+   -v, --version           Print version information
+
+=head1 DESCRIPTION
+
+This script parses an irssi channel log file and enters information into the
+database used by ilbot. You should run this in your ilbot root directory
+which contains the F<database.conf> file and the F<lib> directory.
+
+=head1 AUTHOR
+
+Hinrik E<Ouml>rn SigurE<eth>sson, hinrik.sig@gmail.com
+
+=cut
