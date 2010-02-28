@@ -82,8 +82,8 @@ while (my $line = <>) {
 # decode it appropriately
 sub recode {
     my ($line) = @_;
-    my $utf8 = guess_encoding($line, 'UTF-8');
-    $line = ref $utf8 ? decode('UTF-8', $line) : decode('cp1252', $line);
+    my $utf8 = guess_encoding($line, 'utf8');
+    $line = ref $utf8 ? decode('utf8', $line) : decode('cp1252', $line);
     return $line;
 }
 
