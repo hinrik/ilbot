@@ -101,6 +101,8 @@ sub dbwrite {
     return;
 }
 
+=encoding utf8
+
 =head1 NAME
 
 irssi2ilbot - Feed irssi logs to ilbot's database
