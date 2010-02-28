@@ -5,7 +5,7 @@ use warnings;
 use lib 'lib';
 use Encode 'decode';
 use Encode::Guess;
-use Getopt::Long qw(:config auto_help no_ignore_case bundling);
+use Getopt::Long qw(:config auto_help no_ignore_case);
 use Pod::Usage;
 use IrcLog 'get_dbh';
 use DateTime::Format::DateParse;
