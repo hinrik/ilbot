@@ -3,6 +3,7 @@ use warnings;
 use strict;
 use Config::File;
 use Bot::BasicBot 0.81;
+use POE::Component::IRC::Common qw(irc_to_utf8);
 use Carp qw(confess);
 
 # this is a cleaner reimplementation of ilbot, with Bot::BasicBot which 
@@ -40,14 +41,14 @@ use Data::Dumper;
     sub said {
         my $self = shift;
         my $e = shift;
-        dbwrite($e->{channel}, $e->{who}, $e->{body});
+        dbwrite($e->{channel}, $e->{who}, irc_to_utf8($e->{body}));
         return undef;
     }
 
     sub emoted {
         my $self = shift;
         my $e = shift;
-        dbwrite($e->{channel}, '* ' . $e->{who}, $e->{body});
+        dbwrite($e->{channel}, '* ' . $e->{who}, irc_to_utf8($e->{body}));
         return undef;
 
     }
@@ -93,7 +94,7 @@ use Data::Dumper;
     sub topic {
         my $self = shift;
         my $e = shift;
-        dbwrite($e->{channel}, "", 'Topic for ' . $e->{channel} . ' is now ' . $e->{topic});
+        dbwrite($e->{channel}, "", 'Topic for ' . $e->{channel} . ' is now ' . irc_to_utf8($e->{topic}));
         return undef;
     }
 
@@ -111,7 +112,7 @@ use Data::Dumper;
     sub kicked {
         my $self = shift;
         my $e = shift;
-        dbwrite($e->{channel}, "", $e->{nick} . ' was kicked by ' . $e->{who} . ': ' . $e->{reason});
+        dbwrite($e->{channel}, "", $e->{nick} . ' was kicked by ' . $e->{who} . ': ' . irc_to_utf8($e->{reason}));
         return undef;
     }
 
